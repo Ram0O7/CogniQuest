@@ -1,0 +1,5 @@
+{
+  "name": "CogniQuest",
+  "description": "An intelligent quiz platform that generates customized quizzes from user-uploaded text-based files using Gemini AI. Features configurable quiz settings, a responsive quiz interface, detailed analytics, and an interactive AI chat for deeper learning.",
+  "requestFramePermissions": []
+}
