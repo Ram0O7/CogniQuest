@@ -5,6 +5,7 @@ export enum AppStatus {
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
   CHATTING = 'CHATTING',
+  FLASHCARDS = 'FLASHCARDS',
 }
 
 export type QuestionType = 'MCQ' | 'True/False' | 'Fill-in-the-Blank';
@@ -61,6 +62,8 @@ export interface AppState {
   performanceSummary: string | null;
   isGeneratingSummary: boolean;
   error: string | null;
+  flashcards: Flashcard[] | null;
+  isGeneratingFlashcards: boolean;
 }
 
 export interface ChatMessage {

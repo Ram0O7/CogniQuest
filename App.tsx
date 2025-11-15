@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AppState, AppStatus, QuizConfig, Question, ConfidenceLevel } from './types';
+import { AppState, AppStatus, QuizConfig, Question, ConfidenceLevel, Flashcard } from './types';
 import useLocalStorage from './hooks/useLocalStorage';
 import FileUploadScreen from './components/FileUploadScreen';
 import QuizConfigScreen from './components/QuizConfigScreen';
@@ -7,7 +7,8 @@ import LoadingScreen from './components/LoadingScreen';
 import QuizScreen from './components/QuizScreen';
 import ResultsScreen from './components/ResultsScreen';
 import ChatScreen from './components/ChatScreen';
-import { generateQuiz, generateHint, generatePerformanceSummary } from './services/geminiService';
+import FlashcardScreen from './components/FlashcardScreen';
+import { generateQuiz, generateHint, generatePerformanceSummary, generateFlashcards } from './services/geminiService';
 import { Header } from './components/common/Header';
 
 const initialConfig: QuizConfig = {
@@ -38,6 +39,8 @@ const initialAppState: AppState = {
     performanceSummary: null,
     isGeneratingSummary: false,
     error: null,
+    flashcards: null,
+    isGeneratingFlashcards: false,
 };
 
 
@@ -48,16 +51,12 @@ const App: React.FC = () => {
   );
 
   useEffect(() => {
-    // This effect synchronizes the appState with localStorage.
-    // It is now the single source of truth for persistence.
-    // If the state is initial, it clears storage. Otherwise, it saves the state.
-    if (appState.status === AppStatus.INITIAL) {
-      // Clear storage if we are in the initial state.
+    if (appState.status === AppStatus.INITIAL && storedState !== null) {
       setStoredState(null);
-    } else {
+    } else if (appState.status !== AppStatus.INITIAL) {
       setStoredState(appState);
     }
-  }, [appState, setStoredState]);
+  }, [appState, setStoredState, storedState]);
   
   useEffect(() => {
     if (appState.status === AppStatus.COMPLETED && appState.isGeneratingSummary) {
@@ -199,10 +198,7 @@ const App: React.FC = () => {
   }, [appState.status]);
 
   const handleRestart = () => {
-    if (window.confirm("Are you sure you want to start a new quiz? Your current progress will be lost.")) {
-      // This is now the only action needed. The useEffect will handle clearing storage.
-      setAppState(initialAppState);
-    }
+    setAppState(initialAppState);
   };
 
   const handleRetakeQuiz = useCallback(() => {
@@ -244,6 +240,57 @@ const App: React.FC = () => {
     }));
   }, []);
 
+  const handleStartFlashcards = async () => {
+    const { quizData, userAnswers, fileContents } = appState;
+    if (!quizData || !fileContents) return;
+
+    setAppState(prev => ({ ...prev, isGeneratingFlashcards: true, error: null }));
+
+    try {
+      const incorrectQuestions = quizData.filter((q, index) => {
+        const userAnswer = userAnswers[index];
+        if (userAnswer === null || userAnswer === undefined) return false;
+        if (q.type === 'Fill-in-the-Blank') {
+          return userAnswer.trim().toLowerCase() !== q.correctAnswer.trim().toLowerCase();
+        }
+        return userAnswer !== q.correctAnswer;
+      });
+
+      if (incorrectQuestions.length === 0) {
+        setAppState(prev => ({ ...prev, isGeneratingFlashcards: false }));
+        return; // This case is handled in ResultsScreen UI.
+      }
+      
+      const generatedFlashcards = await generateFlashcards(incorrectQuestions, fileContents);
+      
+      if (generatedFlashcards && generatedFlashcards.length > 0) {
+        setAppState(prev => ({
+          ...prev,
+          status: AppStatus.FLASHCARDS,
+          flashcards: generatedFlashcards,
+          isGeneratingFlashcards: false,
+        }));
+      } else {
+        throw new Error("AI could not generate flashcards from the incorrect answers.");
+      }
+    } catch (error: any) {
+      setAppState(prev => ({
+        ...prev,
+        isGeneratingFlashcards: false,
+        error: `Flashcard Generation Failed: ${error.message}`
+      }));
+    }
+  };
+
+  const handleExitFlashcards = useCallback(() => {
+    setAppState(prev => ({
+      ...prev,
+      status: AppStatus.COMPLETED,
+      flashcards: null,
+    }));
+  }, []);
+
+
   const renderContent = () => {
     // Add a unique key to each top-level component to ensure it re-mounts with a fresh state on status change
     switch (appState.status) {
@@ -284,10 +331,13 @@ const App: React.FC = () => {
           />
         );
       case AppStatus.COMPLETED:
-        return <ResultsScreen key="completed" appState={appState} onRestart={handleRestart} onRetake={handleRetakeQuiz} onStartChat={handleStartChat} onGenerateSummary={handleGenerateSummary} />;
+        return <ResultsScreen key="completed" appState={appState} onRestart={handleRestart} onRetake={handleRetakeQuiz} onStartChat={handleStartChat} onGenerateSummary={handleGenerateSummary} onStartFlashcards={handleStartFlashcards} />;
       case AppStatus.CHATTING:
-        if (!appState.chatContext) return <ResultsScreen key="chat-fallback" appState={appState} onRestart={handleRestart} onRetake={handleRetakeQuiz} onStartChat={handleStartChat} onGenerateSummary={handleGenerateSummary} />;
+        if (!appState.chatContext) return <ResultsScreen key="chat-fallback" appState={appState} onRestart={handleRestart} onRetake={handleRetakeQuiz} onStartChat={handleStartChat} onGenerateSummary={handleGenerateSummary} onStartFlashcards={handleStartFlashcards} />;
         return <ChatScreen key="chatting" chatContext={appState.chatContext} onExitChat={handleExitChat} />;
+      case AppStatus.FLASHCARDS:
+        if (!appState.flashcards) return <ResultsScreen key="flashcard-fallback" appState={appState} onRestart={handleRestart} onRetake={handleRetakeQuiz} onStartChat={handleStartChat} onGenerateSummary={handleGenerateSummary} onStartFlashcards={handleStartFlashcards} />;
+        return <FlashcardScreen key="flashcards" flashcards={appState.flashcards} onExit={handleExitFlashcards} />;
       default:
         return <FileUploadScreen key="default" onFileUploaded={handleFileUploaded} />;
     }

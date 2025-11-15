@@ -1,11 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { AppState, Question, Flashcard } from '../types';
-import { generateFlashcards } from '../services/geminiService';
+import { AppState, Question } from '../types';
 import { CheckCircleIcon } from './common/icons/CheckCircleIcon';
 import { XCircleIcon } from './common/icons/XCircleIcon';
 import { ChevronDownIcon } from './common/icons/ChevronDownIcon';
-import { AlertTriangleIcon } from './common/icons/AlertTriangleIcon';
 import { BrainCircuitIcon } from './common/icons/BrainCircuitIcon';
+import { BookOpenIcon } from './common/icons/BookOpenIcon';
 
 // To satisfy TypeScript for the CDN-loaded libraries
 declare const marked: any;
@@ -17,6 +16,7 @@ interface ResultsScreenProps {
   onRetake: () => void;
   onStartChat: (question: Question) => void;
   onGenerateSummary: () => void;
+  onStartFlashcards: () => void;
 }
 
 const AISummary: React.FC<{ summary: string | null, isLoading: boolean, onGenerate: () => void, hasGenerated: boolean }> = ({ summary, isLoading, onGenerate, hasGenerated }) => {
@@ -56,13 +56,10 @@ const AISummary: React.FC<{ summary: string | null, isLoading: boolean, onGenera
   );
 };
 
-const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRetake, onStartChat, onGenerateSummary }) => {
-  const { quizData, userAnswers, userConfidence, startTime, endTime, quizConfig, performanceSummary, isGeneratingSummary, fileContents } = appState;
+const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRetake, onStartChat, onGenerateSummary, onStartFlashcards }) => {
+  const { quizData, userAnswers, userConfidence, startTime, endTime, quizConfig, performanceSummary, isGeneratingSummary, isGeneratingFlashcards, error } = appState;
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
-  const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
-  // FIX: Added 'info' to the possible types for flashcard messages to support informational messages.
-  const [flashcardMessage, setFlashcardMessage] = useState<{type: 'success' | 'error' | 'info', text: string} | null>(null);
-
+  
   const results = useMemo(() => {
     if (!quizData) return null;
 
@@ -74,6 +71,7 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
 
     let correctAnswers = 0;
     let confidentlyIncorrect = 0;
+    const incorrectQuestionsList: Question[] = [];
     const categoryPerformance: { [key: string]: { correct: number; total: number } } = {};
 
     attemptedEntries.forEach(([indexStr, userAnswer]) => {
@@ -96,8 +94,11 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
       if (isCorrect) {
         correctAnswers++;
         categoryPerformance[category].correct++;
-      } else if (userConfidence[index] === 'Confident') {
-        confidentlyIncorrect++;
+      } else {
+        incorrectQuestionsList.push(q);
+        if (userConfidence[index] === 'Confident') {
+          confidentlyIncorrect++;
+        }
       }
     });
     
@@ -107,12 +108,12 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
     const percentage = attemptedQuestions > 0 ? (correctAnswers / attemptedQuestions) * 100 : 0;
     const timeTaken = endTime && startTime ? Math.round((endTime - startTime) / 1000) : 0;
 
-    return { score, totalQuestions, percentage, timeTaken, categoryPerformance, confidentlyIncorrect, attemptedQuestions, correctAnswers, incorrectAnswers, skippedQuestions };
+    return { score, totalQuestions, percentage, timeTaken, categoryPerformance, confidentlyIncorrect, attemptedQuestions, correctAnswers, incorrectAnswers, skippedQuestions, incorrectQuestionsCount: incorrectQuestionsList.length };
   }, [quizData, userAnswers, userConfidence, startTime, endTime, quizConfig]);
 
   if (!results || !quizData) return <div>Loading results...</div>;
 
-  const { score, totalQuestions, percentage, timeTaken, categoryPerformance, confidentlyIncorrect, attemptedQuestions, correctAnswers, incorrectAnswers, skippedQuestions } = results;
+  const { score, totalQuestions, percentage, timeTaken, categoryPerformance, confidentlyIncorrect, attemptedQuestions, correctAnswers, incorrectAnswers, skippedQuestions, incorrectQuestionsCount } = results;
 
   const toggleExpand = (index: number) => {
     setExpandedIndex(expandedIndex === index ? null : index);
@@ -120,46 +121,6 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
   
   const handleOpenChat = (question: Question) => {
     onStartChat(question);
-  };
-
-  const handleGenerateFlashcards = async () => {
-    if (!quizData || !fileContents) return;
-    setIsGeneratingFlashcards(true);
-    setFlashcardMessage(null);
-    
-    const incorrectQuestions = quizData.filter((q, index) => {
-        const userAnswer = userAnswers[index];
-        if (userAnswer === null || userAnswer === undefined) return false; // Exclude skipped/unanswered
-        if (q.type === 'Fill-in-the-Blank') {
-            return userAnswer.trim().toLowerCase() !== q.correctAnswer.trim().toLowerCase();
-        }
-        return userAnswer !== q.correctAnswer;
-    });
-
-    try {
-        if (incorrectQuestions.length > 0) {
-            const flashcards = await generateFlashcards(incorrectQuestions, fileContents);
-            if (flashcards && flashcards.length > 0) {
-                const dataStr = JSON.stringify(flashcards, null, 2);
-                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-                const exportFileDefaultName = 'cogniquest_flashcards.json';
-                const linkElement = document.createElement('a');
-                linkElement.setAttribute('href', dataUri);
-                linkElement.setAttribute('download', exportFileDefaultName);
-                linkElement.click();
-                setFlashcardMessage({type: 'success', text: 'Flashcard deck downloaded successfully!'});
-            } else {
-                setFlashcardMessage({type: 'error', text: 'Could not generate flashcards from incorrect answers.'});
-            }
-        } else {
-            setFlashcardMessage({type: 'info', text: "No incorrect answers found to generate flashcards from. Great job!"});
-        }
-    } catch (error: any) {
-        console.error("Flashcard generation failed:", error);
-        setFlashcardMessage({type: 'error', text: `Error: ${error.message}`});
-    } finally {
-        setIsGeneratingFlashcards(false);
-    }
   };
 
   return (
@@ -208,8 +169,8 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
           />
        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-200">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
+        <div className="lg:col-span-3 bg-surface p-6 rounded-2xl shadow-lg border border-gray-200">
             <h3 className="font-bold text-xl mb-4">Performance Analytics</h3>
             {confidentlyIncorrect > 0 && (
                 <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 mb-4">
@@ -219,12 +180,14 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
             )}
             <div className="space-y-4">
               {Object.entries(categoryPerformance).map(([category, data]) => {
-                const categoryPercentage = data.total > 0 ? (data.correct / data.total) * 100 : 0;
+                // FIX: Explicitly cast `data` to resolve TypeScript error where it's inferred as `unknown`.
+                const perfData = data as { correct: number; total: number };
+                const categoryPercentage = perfData.total > 0 ? (perfData.correct / perfData.total) * 100 : 0;
                 return (
                   <div key={category}>
                     <div className="flex justify-between items-center mb-1">
                       <span className="font-semibold text-on-surface">{category}</span>
-                      <span className="text-sm font-medium text-on-surface-secondary">{data.correct}/{data.total}</span>
+                      <span className="text-sm font-medium text-on-surface-secondary">{perfData.correct}/{perfData.total}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2.5">
                         <div
@@ -237,7 +200,7 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
               })}
             </div>
         </div>
-        <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-200 flex flex-col justify-center items-center gap-4">
+        <div className="lg:col-span-2 bg-surface p-6 rounded-2xl shadow-lg border border-gray-200 flex flex-col justify-center items-center gap-4 text-center">
           <h3 className="font-bold text-xl mb-2">Continue Your Journey</h3>
           <button onClick={onRetake} className="w-full text-lg bg-secondary text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition-transform transform hover:scale-105">
             Retake This Quiz
@@ -245,24 +208,24 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
           <button onClick={onRestart} className="w-full text-lg bg-primary text-white font-bold py-3 px-4 rounded-lg hover:bg-primary-dark transition-transform transform hover:scale-105">
             Create New Quiz
           </button>
-          <button 
-            onClick={handleGenerateFlashcards} 
-            disabled={isGeneratingFlashcards}
-            className="w-full text-lg bg-gray-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-gray-700 transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-wait">
-            {isGeneratingFlashcards ? 'Generating...' : 'Create Flashcard Deck'}
-          </button>
-           {flashcardMessage && (
-            <div className={`w-full mt-2 p-3 rounded-lg text-sm font-semibold flex items-center gap-2 ${
-                flashcardMessage.type === 'success' ? 'bg-green-50 text-green-800' : 
-                flashcardMessage.type === 'error' ? 'bg-red-50 text-red-800' : 'bg-blue-50 text-blue-800'
-            }`}>
-                {/* FIX: Displays a checkmark for 'success' and 'info' messages, and a warning triangle for 'error' messages. */}
-                {flashcardMessage.type === 'error' ? <AlertTriangleIcon className="w-5 h-5"/> : <CheckCircleIcon className="w-5 h-5"/>}
-                {flashcardMessage.text}
-            </div>
-          )}
         </div>
       </div>
+      
+      <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-200 mb-8 text-center">
+          <h3 className="font-bold text-xl mb-2">Turn Weaknesses into Strengths</h3>
+          <p className="text-on-surface-secondary mb-4 max-w-xl mx-auto">Instantly create and study flashcards based on the questions you answered incorrectly to reinforce your learning.</p>
+          <button 
+            onClick={onStartFlashcards}
+            disabled={isGeneratingFlashcards || incorrectQuestionsCount === 0}
+            className="inline-flex items-center justify-center text-lg bg-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-800 transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-wait"
+          >
+              <BookOpenIcon className="w-6 h-6 mr-2" />
+              {isGeneratingFlashcards ? 'Generating...' : `Study ${incorrectQuestionsCount} Flashcard(s)`}
+          </button>
+          {error && error.includes('Flashcard') && <p className="mt-4 text-sm text-red-600">{error}</p>}
+          {!isGeneratingFlashcards && incorrectQuestionsCount === 0 && <p className="mt-4 text-sm text-green-600 font-semibold">No incorrect answers to study. Great job!</p>}
+      </div>
+
 
       <div>
         <h3 className="text-2xl font-bold mb-4">Question-by-Question Review</h3>
