@@ -126,17 +126,17 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) =
         }
       </p>
       
-      <div className="flex justify-center mb-6 border border-gray-200 rounded-lg p-1 bg-gray-100 max-w-sm mx-auto">
+      <div className="flex justify-center mb-6 border border-gray-200 dark:border-gray-600 rounded-lg p-1 bg-gray-100 dark:bg-slate-800 max-w-sm mx-auto transition-colors">
         <button
             onClick={() => setMode('upload')}
-            className={`flex items-center justify-center gap-2 px-6 py-2 rounded-md font-semibold transition-colors w-1/2 ${mode === 'upload' ? 'bg-white text-primary shadow' : 'text-on-surface-secondary'}`}
+            className={`flex items-center justify-center gap-2 px-6 py-2 rounded-md font-semibold transition-colors w-1/2 ${mode === 'upload' ? 'bg-surface text-primary shadow' : 'text-on-surface-secondary'}`}
         >
             <UploadIcon className="w-5 h-5" />
             Upload Files
         </button>
         <button
             onClick={() => setMode('prompt')}
-            className={`flex items-center justify-center gap-2 px-6 py-2 rounded-md font-semibold transition-colors w-1/2 ${mode === 'prompt' ? 'bg-white text-primary shadow' : 'text-on-surface-secondary'}`}
+            className={`flex items-center justify-center gap-2 px-6 py-2 rounded-md font-semibold transition-colors w-1/2 ${mode === 'prompt' ? 'bg-surface text-primary shadow' : 'text-on-surface-secondary'}`}
         >
             <BrainCircuitIcon className="w-5 h-5" />
             Use Prompt
@@ -151,7 +151,7 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) =
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             className={`relative border-2 border-dashed rounded-xl p-12 transition-colors duration-300 ${
-              isDragging ? 'border-primary bg-primary/10' : 'border-gray-300 bg-surface hover:border-primary'
+              isDragging ? 'border-primary bg-primary/10' : 'border-gray-300 dark:border-gray-600 bg-surface hover:border-primary dark:hover:border-primary'
             }`}
           >
             <input
@@ -173,12 +173,12 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) =
           
           {selectedFiles.length > 0 && (
             <div className="mt-8 text-left">
-              <h3 className="font-semibold text-lg mb-2">Selected Files:</h3>
-              <ul className="bg-surface border border-gray-200 rounded-lg divide-y divide-gray-200">
+              <h3 className="font-semibold text-lg mb-2 text-on-surface">Selected Files:</h3>
+              <ul className="bg-surface border border-gray-200 dark:border-gray-600 rounded-lg divide-y divide-gray-200 dark:divide-gray-600">
                 {selectedFiles.map((file, index) => (
                   <li key={index} className="px-4 py-3 flex justify-between items-center">
-                    <span className="text-sm font-medium truncate">{file.name}</span>
-                    <button onClick={() => handleRemoveFile(index)} className="p-1 text-gray-400 hover:text-red-500 rounded-full hover:bg-gray-100">
+                    <span className="text-sm font-medium truncate text-on-surface">{file.name}</span>
+                    <button onClick={() => handleRemoveFile(index)} className="p-1 text-gray-400 hover:text-red-500 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                       <XMarkIcon className="w-5 h-5" />
                     </button>
                   </li>
@@ -193,7 +193,7 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) =
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="e.g., 'The basics of photosynthesis', 'Key events of World War II', 'JavaScript promises'"
-            className="w-full h-32 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface"
+            className="w-full h-32 p-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface"
             aria-label="Quiz topic prompt"
           />
           <div className="mt-4 text-sm text-on-surface-secondary">
@@ -202,7 +202,7 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) =
         </div>
       )}
 
-      {error && <p className="mt-4 text-sm text-red-600 bg-red-100 p-3 rounded-lg">{error}</p>}
+      {error && <p className="mt-4 text-sm text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400 p-3 rounded-lg">{error}</p>}
       
       <div className="mt-8">
         <button

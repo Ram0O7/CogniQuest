@@ -33,7 +33,7 @@ const QuizConfigScreen: React.FC<QuizConfigScreenProps> = ({ config, onConfigCha
       </p>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg mb-6 flex items-start gap-3">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 p-4 rounded-lg mb-6 flex items-start gap-3">
           <AlertTriangleIcon className="w-6 h-6 flex-shrink-0 mt-0.5" />
           <div>
             <h3 className="font-bold">An Error Occurred</h3>
@@ -42,7 +42,7 @@ const QuizConfigScreen: React.FC<QuizConfigScreenProps> = ({ config, onConfigCha
         </div>
       )}
 
-      <div className="bg-surface p-8 rounded-2xl shadow-lg border border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="bg-surface p-8 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 grid grid-cols-1 md:grid-cols-2 gap-8 transition-colors">
         {/* Left Column */}
         <div className="space-y-6">
           <ConfigItem label="Number of Questions" help="Choose between 5 and 150 questions.">
@@ -54,7 +54,7 @@ const QuizConfigScreen: React.FC<QuizConfigScreenProps> = ({ config, onConfigCha
                 max="150"
                 value={config.numQuestions}
                 onChange={handleNumericChange}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary"
               />
               <span className="font-bold text-primary bg-primary/10 px-3 py-1 rounded-md">{config.numQuestions}</span>
             </div>
@@ -65,7 +65,7 @@ const QuizConfigScreen: React.FC<QuizConfigScreenProps> = ({ config, onConfigCha
               name="questionVariety"
               value={config.questionVariety}
               onChange={handleStringChange}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface"
+              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface"
             >
               <option value="MCQ Only">MCQs Only</option>
               <option value="Varied">Varied (MCQ, T/F, Fill-in-the-blank)</option>
@@ -77,7 +77,7 @@ const QuizConfigScreen: React.FC<QuizConfigScreenProps> = ({ config, onConfigCha
               name="complexity"
               value={config.complexity}
               onChange={handleStringChange}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface"
+              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface"
             >
               <option>Easy</option>
               <option>Medium</option>
@@ -91,7 +91,7 @@ const QuizConfigScreen: React.FC<QuizConfigScreenProps> = ({ config, onConfigCha
               name="tone"
               value={config.tone}
               onChange={handleStringChange}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface"
+              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface"
             >
               <option value="Accurate">Accurate (strict to source)</option>
               <option value="Creative">Creative (engaging phrasing)</option>
@@ -108,7 +108,7 @@ const QuizConfigScreen: React.FC<QuizConfigScreenProps> = ({ config, onConfigCha
                 name="timerType"
                 value={config.timerType}
                 onChange={handleStringChange}
-                className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface"
+                className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface"
               >
                 <option value="overall">Overall</option>
                 <option value="per-question">Per Question</option>
@@ -118,7 +118,7 @@ const QuizConfigScreen: React.FC<QuizConfigScreenProps> = ({ config, onConfigCha
                 name="time"
                 value={config.time}
                 onChange={handleNumericChange}
-                className="w-24 p-2 border border-gray-300 rounded-lg text-center bg-surface text-on-surface"
+                className="w-24 p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-center bg-surface text-on-surface"
                 min="1"
               />
               <span>{config.timerType === 'overall' ? 'minutes' : 'seconds'}</span>
@@ -136,7 +136,7 @@ const QuizConfigScreen: React.FC<QuizConfigScreenProps> = ({ config, onConfigCha
                   onChange={handleToggleChange}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-primary/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-focus:ring-4 peer-focus:ring-primary/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
               </label>
               {config.negativeMarking && (
                 <div className="flex items-center gap-2">
@@ -149,7 +149,7 @@ const QuizConfigScreen: React.FC<QuizConfigScreenProps> = ({ config, onConfigCha
                     onChange={handleNumericChange}
                     step="0.05"
                     min="0"
-                    className="w-20 p-2 border border-gray-300 rounded-lg text-center bg-surface text-on-surface"
+                    className="w-20 p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-center bg-surface text-on-surface"
                   />
                 </div>
               )}
@@ -161,7 +161,7 @@ const QuizConfigScreen: React.FC<QuizConfigScreenProps> = ({ config, onConfigCha
               name="feedbackMode"
               value={config.feedbackMode}
               onChange={handleStringChange}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface"
+              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface"
             >
               <option value="end-of-quiz">End of Quiz</option>
               <option value="instant">Instant</option>

@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
             colors: {
@@ -17,10 +18,10 @@
                 dark: '#4338ca',
               },
               secondary: '#10b981',
-              background: '#f8fafc',
-              surface: '#ffffff',
-              'on-surface': '#1f2937',
-              'on-surface-secondary': '#6b7280',
+              background: 'var(--background)',
+              surface: 'var(--surface)',
+              'on-surface': 'var(--on-surface)',
+              'on-surface-secondary': 'var(--on-surface-secondary)',
               correct: '#22c55e',
               incorrect: '#ef4444',
             },
@@ -42,6 +43,22 @@
         }
       }
     </script>
+    <style type="text/tailwindcss">
+      @layer base {
+        :root {
+          --background: #f8fafc;
+          --surface: #ffffff;
+          --on-surface: #1f2937;
+          --on-surface-secondary: #6b7280;
+        }
+        .dark {
+          --background: #0f172a;
+          --surface: #1e293b;
+          --on-surface: #f1f5f9;
+          --on-surface-secondary: #94a3b8;
+        }
+      }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
   <script type="importmap">
@@ -55,7 +72,7 @@
 }
 </script>
 </head>
-  <body class="bg-background text-on-surface">
+  <body class="bg-background text-on-surface transition-colors duration-300">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

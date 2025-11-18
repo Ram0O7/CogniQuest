@@ -161,7 +161,7 @@ export const generateFlashcards = async (incorrectQuestions: Question[], origina
   const combinedContext = originalContexts.join('\n\n--- (New Document) ---\n\n');
 
   const prompt = `
-    Based on the original context provided and the list of questions the user answered incorrectly, generate a set of 5-7 high-quality flashcards to help them study. Each flashcard should focus on a key concept they misunderstood.
+    Based on the original context provided and the list of questions the user answered incorrectly, generate flashcards to help them study.
 
     Original Context:
     """
@@ -172,8 +172,9 @@ export const generateFlashcards = async (incorrectQuestions: Question[], origina
     ${JSON.stringify(incorrectQuestions.map(q => ({question: q.question, correctAnswer: q.correctAnswer, category: q.category})), null, 2)}
 
     Instructions:
-    - Create flashcards that are concise and easy to remember.
-    - The "front" should be a question, a key term, or a concept.
+    - Generate exactly ${incorrectQuestions.length} flashcards.
+    - Create exactly one flashcard corresponding to each incorrect question provided above.
+    - The "front" should be the question concept or term related to the error.
     - The "back" should be the answer or a clear, brief explanation.
     - Ensure the flashcards directly address the knowledge gaps revealed by the incorrect answers.
   `;

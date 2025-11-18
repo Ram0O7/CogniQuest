@@ -50,6 +50,21 @@ const App: React.FC = () => {
     storedState || initialAppState
   );
 
+  // Theme State
+  const [theme, setTheme] = useLocalStorage('theme', 'light');
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
   useEffect(() => {
     if (appState.status === AppStatus.INITIAL && storedState !== null) {
       setStoredState(null);
@@ -344,8 +359,13 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header onRestart={handleRestart} showRestart={appState.status !== AppStatus.INITIAL && appState.status !== AppStatus.CHATTING} />
+    <div className="min-h-screen bg-background transition-colors duration-300">
+      <Header 
+        onRestart={handleRestart} 
+        showRestart={appState.status !== AppStatus.INITIAL && appState.status !== AppStatus.CHATTING} 
+        theme={theme}
+        toggleTheme={toggleTheme}
+      />
       <main className="container mx-auto p-4 md:p-8">
         {renderContent()}
       </main>

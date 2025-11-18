@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { AppState, Question } from '../types';
 import { CheckCircleIcon } from './common/icons/CheckCircleIcon';
 import { XCircleIcon } from './common/icons/XCircleIcon';
@@ -23,7 +23,7 @@ const AISummary: React.FC<{ summary: string | null, isLoading: boolean, onGenera
   
   if (!hasGenerated) {
     return (
-      <div className="text-center p-4 border-2 border-dashed rounded-lg">
+      <div className="text-center p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
         <p className="mb-4 text-on-surface-secondary">Get deeper insights into your performance and actionable study tips.</p>
         <button
           onClick={onGenerate}
@@ -39,11 +39,11 @@ const AISummary: React.FC<{ summary: string | null, isLoading: boolean, onGenera
   if (isLoading) {
     return (
       <div className="space-y-4 animate-pulse-faint p-4">
-        <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-        <div className="h-4 bg-gray-200 rounded w-full"></div>
-        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-        <div className="h-4 bg-gray-200 rounded w-1/2 mt-4"></div>
-        <div className="h-4 bg-gray-200 rounded w-full"></div>
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mt-4"></div>
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
       </div>
     );
   }
@@ -52,13 +52,105 @@ const AISummary: React.FC<{ summary: string | null, isLoading: boolean, onGenera
 
   const sanitizedHtml = DOMPurify.sanitize(marked.parse(summary));
   return (
-      <div className="prose max-w-none prose-p:my-2 prose-headings:my-4 prose-ul:my-2 prose-li:my-1 break-words" dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
+      <div className="prose dark:prose-invert max-w-none prose-p:my-2 prose-headings:my-4 prose-ul:my-2 prose-li:my-1 break-words text-on-surface" dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
+  );
+};
+
+const ReviewItem: React.FC<{
+  question: Question;
+  userAnswer: string | null | undefined;
+  confidence: string;
+  index: number;
+  isExpanded: boolean;
+  toggleExpand: () => void;
+  onChat: (q: Question) => void;
+  autoReveal: boolean;
+}> = ({ question, userAnswer, confidence, index, isExpanded, toggleExpand, onChat, autoReveal }) => {
+  const [isRevealed, setIsRevealed] = useState(autoReveal);
+
+  // Sync reveal state with expansion and auto-reveal setting
+  useEffect(() => {
+    if (!isExpanded) {
+      setIsRevealed(autoReveal); // Reset when collapsed
+    } else if (autoReveal) {
+      setIsRevealed(true);
+    }
+  }, [isExpanded, autoReveal]);
+
+  let isCorrect = false;
+  const isSkipped = userAnswer === null || userAnswer === undefined;
+
+  if (!isSkipped) {
+    if (question.type === 'Fill-in-the-Blank') {
+      isCorrect = userAnswer?.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase();
+    } else {
+      isCorrect = userAnswer === question.correctAnswer;
+    }
+  }
+
+  return (
+    <div className="bg-surface border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden transition-colors">
+      <button
+        onClick={toggleExpand}
+        className="w-full flex justify-between items-center p-4 text-left text-on-surface hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+      >
+        <div className="flex items-center">
+          {isSkipped ? (
+             <span className="w-6 h-6 text-gray-400 font-bold mr-3 flex-shrink-0 text-center">-</span>
+          ) : isCorrect ? (
+             <CheckCircleIcon className="w-6 h-6 text-correct mr-3 flex-shrink-0" />
+          ) : (
+             <XCircleIcon className="w-6 h-6 text-incorrect mr-3 flex-shrink-0" />
+          )}
+          <span className="font-semibold flex-1">{index + 1}. {question.question}</span>
+        </div>
+        <div className="flex items-center gap-4">
+          {confidence && <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+              confidence === 'Confident' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200' :
+              confidence === 'Not Sure' ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-200' :
+              'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+          }`}>{confidence}</span>}
+          <ChevronDownIcon
+              className={`w-6 h-6 text-gray-500 transform transition-transform ${
+              isExpanded ? 'rotate-180' : ''
+              }`}
+          />
+          </div>
+      </button>
+      {isExpanded && (
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800/50 text-on-surface">
+          <p className="mb-2"><strong>Your Answer:</strong> 
+              {isSkipped ? <span className="text-gray-500 font-semibold"> Skipped</span> : 
+              <span className={isCorrect ? 'text-correct' : 'text-incorrect'}> {userAnswer}</span>}
+          </p>
+          
+          {!isRevealed && !isCorrect ? (
+            <button 
+              onClick={() => setIsRevealed(true)}
+              className="mt-2 mb-4 text-sm font-bold text-primary hover:text-primary-dark underline"
+            >
+              Show Correct Answer & Explanation
+            </button>
+          ) : (
+            <div className="animate-fade-in">
+               {(!isCorrect || isSkipped) && <p className="mb-2"><strong>Correct Answer:</strong> <span className="text-correct">{question.correctAnswer}</span></p>}
+               <p className="mb-4"><strong>Explanation:</strong> {question.explanation}</p>
+            </div>
+          )}
+          
+          <button onClick={() => onChat(question)} className="block mt-2 text-sm text-primary font-semibold hover:underline">
+            Discuss with AI Tutor
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 
 const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRetake, onStartChat, onGenerateSummary, onStartFlashcards }) => {
   const { quizData, userAnswers, userConfidence, startTime, endTime, quizConfig, performanceSummary, isGeneratingSummary, isGeneratingFlashcards, error } = appState;
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [autoReveal, setAutoReveal] = useState(false);
   
   const results = useMemo(() => {
     if (!quizData) return null;
@@ -113,7 +205,7 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
 
   if (!results || !quizData) return <div>Loading results...</div>;
 
-  const { score, totalQuestions, percentage, timeTaken, categoryPerformance, confidentlyIncorrect, attemptedQuestions, correctAnswers, incorrectAnswers, skippedQuestions, incorrectQuestionsCount } = results;
+  const { score, totalQuestions, percentage, timeTaken, confidentlyIncorrect, attemptedQuestions, correctAnswers, incorrectAnswers, skippedQuestions, incorrectQuestionsCount } = results;
 
   const toggleExpand = (index: number) => {
     setExpandedIndex(expandedIndex === index ? null : index);
@@ -125,25 +217,25 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
 
   return (
     <div className="animate-fade-in">
-      <div className="bg-surface p-8 rounded-2xl shadow-lg border border-gray-200 mb-8">
-        <h2 className="text-3xl font-extrabold text-center mb-2">Quiz Completed!</h2>
+      <div className="bg-surface p-8 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 mb-8 transition-colors">
+        <h2 className="text-3xl font-extrabold text-center mb-2 text-on-surface">Quiz Completed!</h2>
         <p className="text-center text-lg text-on-surface-secondary mb-8">Here's your performance breakdown.</p>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-          <div className="bg-primary/10 p-4 rounded-xl">
+          <div className="bg-primary/10 dark:bg-primary/20 p-4 rounded-xl">
             <div className="text-3xl font-bold text-primary">{score.toFixed(2)}</div>
             <div className="text-sm text-on-surface font-semibold mt-1">Score</div>
           </div>
-          <div className="bg-secondary/10 p-4 rounded-xl">
+          <div className="bg-secondary/10 dark:bg-secondary/20 p-4 rounded-xl">
             <div className="text-3xl font-bold text-secondary">{percentage.toFixed(1)}%</div>
             <div className="text-sm text-on-surface font-semibold mt-1">Accuracy</div>
           </div>
-          <div className="bg-amber-100 p-4 rounded-xl">
-            <div className="text-3xl font-bold text-amber-600">{attemptedQuestions}/{totalQuestions}</div>
+          <div className="bg-amber-100 dark:bg-amber-900/30 p-4 rounded-xl">
+            <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{attemptedQuestions}/{totalQuestions}</div>
             <div className="text-sm text-on-surface font-semibold mt-1">Attempted</div>
           </div>
-          <div className="bg-indigo-100 p-4 rounded-xl">
-            <div className="text-3xl font-bold text-indigo-600">
+          <div className="bg-indigo-100 dark:bg-indigo-900/30 p-4 rounded-xl">
+            <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
               {Math.floor(timeTaken / 60)}m {timeTaken % 60}s
             </div>
             <div className="text-sm text-on-surface font-semibold mt-1">Time Taken</div>
@@ -152,12 +244,12 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
         <div className="mt-6 flex justify-center gap-6 text-on-surface-secondary">
             <div className="text-center"><span className="font-bold text-correct">{correctAnswers}</span> Correct</div>
             <div className="text-center"><span className="font-bold text-incorrect">{incorrectAnswers}</span> Incorrect</div>
-            <div className="text-center"><span className="font-bold">{skippedQuestions}</span> Skipped</div>
+            <div className="text-center"><span className="font-bold text-on-surface">{skippedQuestions}</span> Skipped</div>
         </div>
       </div>
       
-       <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-200 mb-8">
-          <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
+       <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 mb-8 transition-colors">
+          <h3 className="font-bold text-xl mb-4 flex items-center gap-2 text-on-surface">
             <BrainCircuitIcon className="w-6 h-6 text-primary" />
             AI-Powered Analysis
           </h3>
@@ -169,128 +261,74 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
           />
        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
-        <div className="lg:col-span-3 bg-surface p-6 rounded-2xl shadow-lg border border-gray-200">
-            <h3 className="font-bold text-xl mb-4">Performance Analytics</h3>
-            {confidentlyIncorrect > 0 && (
-                <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 mb-4">
-                    <p><strong><span className="text-2xl">{confidentlyIncorrect}</span> blind spot(s) found.</strong></p>
-                    <p className="text-sm">These are questions you answered incorrectly with high confidence. It's a good idea to review these topics thoroughly.</p>
-                </div>
-            )}
-            <div className="space-y-4">
-              {Object.entries(categoryPerformance).map(([category, data]) => {
-                // FIX: Explicitly cast `data` to resolve TypeScript error where it's inferred as `unknown`.
-                const perfData = data as { correct: number; total: number };
-                const categoryPercentage = perfData.total > 0 ? (perfData.correct / perfData.total) * 100 : 0;
-                return (
-                  <div key={category}>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-semibold text-on-surface">{category}</span>
-                      <span className="text-sm font-medium text-on-surface-secondary">{perfData.correct}/{perfData.total}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                        <div
-                            className="bg-primary h-2.5 rounded-full transition-all duration-500 ease-out"
-                            style={{ width: `${categoryPercentage}%` }}
-                        ></div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+      <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 mb-8 flex flex-col md:flex-row justify-center items-center gap-6 transition-colors">
+        <div className="text-center md:text-left flex-1">
+             <h3 className="font-bold text-xl mb-2 text-on-surface">Continue Your Journey</h3>
+             {confidentlyIncorrect > 0 && (
+                <p className="text-red-600 dark:text-red-400 text-sm mb-2">
+                   <strong>Note:</strong> You had {confidentlyIncorrect} "blind spots" (incorrect answers with high confidence).
+                </p>
+             )}
         </div>
-        <div className="lg:col-span-2 bg-surface p-6 rounded-2xl shadow-lg border border-gray-200 flex flex-col justify-center items-center gap-4 text-center">
-          <h3 className="font-bold text-xl mb-2">Continue Your Journey</h3>
-          <button onClick={onRetake} className="w-full text-lg bg-secondary text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition-transform transform hover:scale-105">
-            Retake This Quiz
-          </button>
-          <button onClick={onRestart} className="w-full text-lg bg-primary text-white font-bold py-3 px-4 rounded-lg hover:bg-primary-dark transition-transform transform hover:scale-105">
-            Create New Quiz
-          </button>
+        <div className="flex gap-4 w-full md:w-auto">
+             <button onClick={onRetake} className="flex-1 md:flex-none text-lg bg-secondary text-white font-bold py-3 px-6 rounded-lg hover:bg-green-600 transition-transform transform hover:scale-105">
+                Retake This Quiz
+             </button>
+             <button onClick={onRestart} className="flex-1 md:flex-none text-lg bg-primary text-white font-bold py-3 px-6 rounded-lg hover:bg-primary-dark transition-transform transform hover:scale-105">
+                Create New Quiz
+             </button>
         </div>
       </div>
       
-      <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-200 mb-8 text-center">
-          <h3 className="font-bold text-xl mb-2">Turn Weaknesses into Strengths</h3>
+      <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 mb-8 text-center transition-colors">
+          <h3 className="font-bold text-xl mb-2 text-on-surface">Turn Weaknesses into Strengths</h3>
           <p className="text-on-surface-secondary mb-4 max-w-xl mx-auto">Instantly create and study flashcards based on the questions you answered incorrectly to reinforce your learning.</p>
           <button 
             onClick={onStartFlashcards}
             disabled={isGeneratingFlashcards || incorrectQuestionsCount === 0}
-            className="inline-flex items-center justify-center text-lg bg-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-800 transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-wait"
+            className="inline-flex items-center justify-center text-lg bg-gray-700 dark:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-500 transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-wait"
           >
               <BookOpenIcon className="w-6 h-6 mr-2" />
               {isGeneratingFlashcards ? 'Generating...' : `Study ${incorrectQuestionsCount} Flashcard(s)`}
           </button>
-          {error && error.includes('Flashcard') && <p className="mt-4 text-sm text-red-600">{error}</p>}
-          {!isGeneratingFlashcards && incorrectQuestionsCount === 0 && <p className="mt-4 text-sm text-green-600 font-semibold">No incorrect answers to study. Great job!</p>}
+          {error && error.includes('Flashcard') && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
+          {!isGeneratingFlashcards && incorrectQuestionsCount === 0 && <p className="mt-4 text-sm text-green-600 dark:text-green-400 font-semibold">No incorrect answers to study. Great job!</p>}
       </div>
 
 
       <div>
-        <h3 className="text-2xl font-bold mb-4">Question-by-Question Review</h3>
-        <div className="space-y-4">
-          {quizData.map((q, index) => {
-            const userAnswer = userAnswers[index];
-            const confidence = userConfidence[index];
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+            <h3 className="text-2xl font-bold text-on-surface">Question-by-Question Review</h3>
             
-            let isCorrect = false;
-            let isSkipped = userAnswer === null || userAnswer === undefined;
-
-            if (!isSkipped) {
-              if (q.type === 'Fill-in-the-Blank') {
-                isCorrect = userAnswer?.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase();
-              } else {
-                isCorrect = userAnswer === q.correctAnswer;
-              }
-            }
-            
-            return (
-              <div key={index} className="bg-surface border border-gray-200 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleExpand(index)}
-                  className="w-full flex justify-between items-center p-4 text-left"
-                >
-                  <div className="flex items-center">
-                    {isSkipped ? (
-                      <span className="w-6 h-6 text-gray-400 font-bold mr-3 flex-shrink-0 text-center">-</span>
-                    ) : isCorrect ? (
-                      <CheckCircleIcon className="w-6 h-6 text-correct mr-3 flex-shrink-0" />
-                    ) : (
-                      <XCircleIcon className="w-6 h-6 text-incorrect mr-3 flex-shrink-0" />
-                    )}
-                    <span className="font-semibold flex-1">{index + 1}. {q.question}</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    {confidence && <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                        confidence === 'Confident' ? 'bg-emerald-100 text-emerald-800' :
-                        confidence === 'Not Sure' ? 'bg-sky-100 text-sky-800' :
-                        'bg-amber-100 text-amber-800'
-                    }`}>{confidence}</span>}
-                    <ChevronDownIcon
-                        className={`w-6 h-6 text-gray-500 transform transition-transform ${
-                        expandedIndex === index ? 'rotate-180' : ''
-                        }`}
+            <div className="flex items-center gap-3 bg-surface p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                <span className="text-sm font-medium text-on-surface">Auto-reveal Solutions</span>
+                <label htmlFor="auto-reveal-toggle" className="relative inline-flex items-center cursor-pointer">
+                    <input
+                        type="checkbox"
+                        id="auto-reveal-toggle"
+                        checked={autoReveal}
+                        onChange={() => setAutoReveal(!autoReveal)}
+                        className="sr-only peer"
                     />
-                   </div>
-                </button>
-                {expandedIndex === index && (
-                  <div className="p-4 border-t border-gray-200 bg-gray-50">
-                    <p className="mb-2"><strong>Your Answer:</strong> 
-                        {isSkipped ? <span className="text-gray-500 font-semibold"> Skipped</span> : 
-                        <span className={isCorrect ? 'text-correct' : 'text-incorrect'}> {userAnswer}</span>}
-                    </p>
-                    {!isCorrect && !isSkipped && <p className="mb-2"><strong>Correct Answer:</strong> <span className="text-correct">{q.correctAnswer}</span></p>}
-                     {isSkipped && <p className="mb-2"><strong>Correct Answer:</strong> <span className="text-correct">{q.correctAnswer}</span></p>}
-                    <p className="mb-4"><strong>Explanation:</strong> {q.explanation}</p>
-                    <button onClick={() => handleOpenChat(q)} className="text-sm text-primary font-semibold hover:underline">
-                      Discuss with AI Tutor
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                    <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-focus:ring-4 peer-focus:ring-primary/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+            </div>
+        </div>
+
+        <div className="space-y-4">
+          {quizData.map((q, index) => (
+            <ReviewItem
+                key={index}
+                question={q}
+                userAnswer={userAnswers[index]}
+                confidence={userConfidence[index]}
+                index={index}
+                isExpanded={expandedIndex === index}
+                toggleExpand={() => toggleExpand(index)}
+                onChat={handleOpenChat}
+                autoReveal={autoReveal}
+            />
+          ))}
         </div>
       </div>
     </div>

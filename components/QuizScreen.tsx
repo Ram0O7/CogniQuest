@@ -33,6 +33,12 @@ const ConfidenceSelector: React.FC<{
     'bg-sky-100 text-sky-800 hover:bg-sky-200 ring-sky-300', // Not Sure
     'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 ring-emerald-300', // Confident
   ];
+  
+  const darkColors = [
+      'dark:bg-amber-900/30 dark:text-amber-200 dark:hover:bg-amber-900/50 dark:ring-amber-700',
+      'dark:bg-sky-900/30 dark:text-sky-200 dark:hover:bg-sky-900/50 dark:ring-sky-700',
+      'dark:bg-emerald-900/30 dark:text-emerald-200 dark:hover:bg-emerald-900/50 dark:ring-emerald-700'
+  ];
 
   return (
     <div className="mt-8">
@@ -44,7 +50,7 @@ const ConfidenceSelector: React.FC<{
             onClick={() => onSelect(level)}
             disabled={disabled}
             className={`px-4 py-2 text-sm font-semibold rounded-full transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
-              selectedIndex === index ? `ring-2 ${colors[index]}` : `bg-gray-100 text-gray-600 hover:bg-gray-200`
+              selectedIndex === index ? `ring-2 ${colors[index]} ${darkColors[index]}` : `bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700`
             }`}
           >
             {level}
@@ -127,20 +133,20 @@ const QuizScreen: React.FC<QuizScreenProps> = ({
 
   const getOptionClass = (option: string) => {
     if (isSkipped) {
-      return 'bg-gray-100 text-gray-500';
+      return 'bg-gray-100 text-gray-500 dark:bg-slate-800 dark:text-gray-500';
     }
     if (!showFeedback && selectedAnswer === option) {
-      return 'ring-2 ring-primary bg-primary/10';
+      return 'ring-2 ring-primary bg-primary/10 dark:bg-primary/20';
     }
     if (showFeedback && selectedAnswer) {
       if (option === currentQuestion.correctAnswer) {
-        return 'bg-correct/20 text-green-800 ring-2 ring-correct';
+        return 'bg-correct/20 text-green-800 dark:text-green-200 ring-2 ring-correct';
       }
       if (option === selectedAnswer && option !== currentQuestion.correctAnswer) {
-        return 'bg-incorrect/20 text-red-800 ring-2 ring-incorrect';
+        return 'bg-incorrect/20 text-red-800 dark:text-red-200 ring-2 ring-incorrect';
       }
     }
-    return 'bg-surface hover:bg-gray-100';
+    return 'bg-surface hover:bg-gray-100 dark:hover:bg-slate-800';
   };
 
   const renderAnswerInput = () => {
@@ -157,7 +163,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({
                 key={index}
                 onClick={() => handleOptionClick(option)}
                 disabled={showFeedback || isSkipped}
-                className={`w-full text-left p-4 rounded-lg border border-gray-200 transition-all duration-200 text-on-surface ${getOptionClass(option)} disabled:cursor-not-allowed`}
+                className={`w-full text-left p-4 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-200 text-on-surface ${getOptionClass(option)} disabled:cursor-not-allowed`}
               >
                 <span className="font-semibold">{type === 'MCQ' ? `${String.fromCharCode(65 + index)}. ` : ''}</span> {option}
               </button>
@@ -173,7 +179,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({
               onChange={(e) => onAnswerSelect(currentQuestionIndex, e.target.value)}
               disabled={showFeedback || isSkipped}
               placeholder="Type your answer here..."
-              className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface disabled:bg-gray-100 disabled:text-gray-500"
+              className="w-full p-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-on-surface disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:text-gray-500"
             />
           </div>
         );
@@ -189,7 +195,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto animate-fade-in">
-      <div className="bg-surface p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200">
+      <div className="bg-surface p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 transition-colors">
         <div className="flex justify-between items-center mb-4">
           <div className="text-sm text-on-surface-secondary font-medium">
             Question {currentQuestionIndex + 1} of {quizData.length}
@@ -207,13 +213,13 @@ const QuizScreen: React.FC<QuizScreenProps> = ({
         <div className="mt-8">
             <div className="flex justify-between items-start gap-4">
                 <h3 className="text-xl md:text-2xl font-bold text-on-surface leading-tight flex-1">
-                    {isSkipped && <span className="text-sm font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-md mr-2">SKIPPED</span>}
+                    {isSkipped && <span className="text-sm font-bold text-gray-500 bg-gray-100 dark:bg-slate-800 px-2 py-1 rounded-md mr-2">SKIPPED</span>}
                     {currentQuestion.question}
                 </h3>
                 <button 
                     onClick={handleGetHintClick} 
                     disabled={!!currentHint || isLoadingHint}
-                    className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-yellow-700 bg-yellow-100 rounded-lg hover:bg-yellow-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-yellow-700 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-200 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                     <LightbulbIcon className={`w-5 h-5 ${isLoadingHint ? 'animate-pulse' : ''}`}/>
                     {isLoadingHint ? 'Getting...' : (currentHint ? 'Hint Used' : 'Get Hint')}
@@ -221,7 +227,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({
             </div>
           
           {currentHint && (
-            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 animate-fade-in">
+            <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-yellow-800 dark:text-yellow-200 animate-fade-in">
               <strong>Hint:</strong> {currentHint}
             </div>
           )}
@@ -254,13 +260,13 @@ const QuizScreen: React.FC<QuizScreenProps> = ({
         <button
           onClick={onPrev}
           disabled={currentQuestionIndex === 0}
-          className="px-6 py-3 bg-white border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-3 bg-surface border border-gray-300 dark:border-gray-600 text-on-surface rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Previous
         </button>
         <button
             onClick={handleSkipClick}
-            className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
+            className="px-6 py-3 bg-surface border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
           >
             Skip
           </button>

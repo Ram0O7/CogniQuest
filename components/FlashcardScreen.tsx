@@ -46,11 +46,11 @@ const FlashcardScreen: React.FC<FlashcardScreenProps> = ({ flashcards, onExit })
   return (
     <div className="max-w-4xl mx-auto animate-fade-in">
       <div className="flex justify-between items-center mb-6">
-        <button onClick={onExit} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg font-semibold hover:bg-gray-50">
+        <button onClick={onExit} className="flex items-center gap-2 px-4 py-2 bg-surface border border-gray-300 dark:border-gray-600 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 text-on-surface transition-colors">
           <ArrowLeftIcon className="w-5 h-5" />
           Back to Results
         </button>
-        <button onClick={handleDownload} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg font-semibold hover:bg-gray-50">
+        <button onClick={handleDownload} className="flex items-center gap-2 px-4 py-2 bg-surface border border-gray-300 dark:border-gray-600 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 text-on-surface transition-colors">
             <DownloadIcon className="w-5 h-5" />
             Download Deck
         </button>
@@ -62,7 +62,7 @@ const FlashcardScreen: React.FC<FlashcardScreenProps> = ({ flashcards, onExit })
             onClick={() => setIsFlipped(!isFlipped)}
         >
             {/* Front of card */}
-            <div className="absolute w-full h-full backface-hidden bg-surface border border-gray-200 rounded-2xl shadow-lg flex items-center justify-center p-8 text-center cursor-pointer">
+            <div className="absolute w-full h-full backface-hidden bg-surface border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg flex items-center justify-center p-8 text-center cursor-pointer transition-colors">
                 <p className="text-xl md:text-3xl font-bold text-on-surface">{currentCard.front}</p>
             </div>
             {/* Back of card */}
@@ -76,7 +76,7 @@ const FlashcardScreen: React.FC<FlashcardScreenProps> = ({ flashcards, onExit })
         <button 
           onClick={handlePrev} 
           disabled={currentIndex === 0}
-          className="px-6 py-3 bg-white border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-3 bg-surface border border-gray-300 dark:border-gray-600 text-on-surface rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Previous
         </button>
