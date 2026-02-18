@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { AppState, Question } from '../types';
 import { CheckCircleIcon } from './common/icons/CheckCircleIcon';
@@ -5,6 +6,7 @@ import { XCircleIcon } from './common/icons/XCircleIcon';
 import { ChevronDownIcon } from './common/icons/ChevronDownIcon';
 import { BrainCircuitIcon } from './common/icons/BrainCircuitIcon';
 import { BookOpenIcon } from './common/icons/BookOpenIcon';
+import { DownloadIcon } from './common/icons/DownloadIcon';
 
 // To satisfy TypeScript for the CDN-loaded libraries
 declare const marked: any;
@@ -215,6 +217,43 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
     onStartChat(question);
   };
 
+  const handleDownloadJSON = () => {
+    const dataStr = JSON.stringify(quizData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `cogniquest_quiz_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadTXT = () => {
+    const txtContent = quizData.map((q, i) => {
+      let text = `Q${i + 1}: ${q.question}\n`;
+      if (q.type !== 'Fill-in-the-Blank' && q.options) {
+        q.options.forEach((opt, idx) => {
+          text += `   ${String.fromCharCode(65 + idx)}) ${opt}\n`;
+        });
+      }
+      text += `\n   Correct Answer: ${q.correctAnswer}\n`;
+      text += `   Explanation: ${q.explanation}\n`;
+      return text;
+    }).join('\n' + '-'.repeat(40) + '\n\n');
+
+    const blob = new Blob([txtContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `cogniquest_quiz_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="animate-fade-in">
       <div className="bg-surface p-8 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 mb-8 transition-colors">
@@ -278,6 +317,22 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
                 Create New Quiz
              </button>
         </div>
+      </div>
+
+      <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 mb-8 transition-colors">
+          <h3 className="font-bold text-xl mb-4 flex items-center gap-2 text-on-surface">
+              <DownloadIcon className="w-6 h-6 text-primary" />
+              Save & Export Quiz
+          </h3>
+          <p className="text-on-surface-secondary mb-6">Download the generated quiz questions, answers, and explanations for future practice.</p>
+          <div className="flex gap-4 flex-wrap">
+              <button onClick={handleDownloadJSON} className="flex items-center justify-center gap-2 px-4 py-2 bg-surface border border-gray-300 dark:border-gray-600 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 text-on-surface transition-colors w-full sm:w-auto">
+                  <span className="font-mono text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded">JSON</span> Download JSON
+              </button>
+              <button onClick={handleDownloadTXT} className="flex items-center justify-center gap-2 px-4 py-2 bg-surface border border-gray-300 dark:border-gray-600 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 text-on-surface transition-colors w-full sm:w-auto">
+                  <span className="font-mono text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded">TXT</span> Download Text
+              </button>
+          </div>
       </div>
       
       <div className="bg-surface p-6 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 mb-8 text-center transition-colors">
