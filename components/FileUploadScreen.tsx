@@ -1,11 +1,14 @@
+
 import React, { useState, useCallback } from 'react';
 import { UploadIcon } from './common/icons/UploadIcon';
 import { XMarkIcon } from './common/icons/XMarkIcon';
 import { BrainCircuitIcon } from './common/icons/BrainCircuitIcon';
+import { extractTextFromPdf } from '../utils/pdfUtils';
+import { SourceMaterial } from '../types';
 
 
 interface FileUploadScreenProps {
-  onFileUploaded: (contents: string[]) => void;
+  onFileUploaded: (materials: SourceMaterial[]) => void;
 }
 
 const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) => {
@@ -19,12 +22,15 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) =
   const addFiles = useCallback((files: FileList) => {
     setError(null);
     const newFiles = Array.from(files).filter(file => 
-      (file.type.startsWith('text/') || file.type === 'application/json') &&
+      (file.type.startsWith('text/') || 
+       file.type === 'application/json' || 
+       file.type === 'application/pdf' ||
+       file.type.startsWith('image/')) &&
       !selectedFiles.some(existingFile => existingFile.name === file.name && existingFile.size === file.size)
     );
 
     if (newFiles.length !== files.length) {
-      setError('Some files were duplicates or not valid text files and were ignored.');
+      setError('Some files were duplicates or not supported (Text, PDF, Images only).');
     }
     
     setSelectedFiles(prev => [...prev, ...newFiles]);
@@ -79,17 +85,43 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) =
         return;
       }
       try {
-        const fileContents = await Promise.all(
-          selectedFiles.map(file => {
-            return new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = (e) => resolve(e.target?.result as string);
-              reader.onerror = (e) => reject(new Error(`Error reading ${file.name}`));
-              reader.readAsText(file);
-            });
+        const materials: SourceMaterial[] = await Promise.all(
+          selectedFiles.map(async (file) => {
+            if (file.type === 'application/pdf') {
+              const text = await extractTextFromPdf(file);
+              return { type: 'text', content: text, fileName: file.name };
+            } else if (file.type.startsWith('image/')) {
+              return new Promise<SourceMaterial>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  const result = e.target?.result as string;
+                  // Strip the Data URL prefix to get raw Base64
+                  const base64Content = result.split(',')[1]; 
+                  resolve({
+                    type: 'image',
+                    content: base64Content,
+                    mimeType: file.type,
+                    fileName: file.name
+                  });
+                };
+                reader.onerror = () => reject(new Error(`Error reading image ${file.name}`));
+                reader.readAsDataURL(file);
+              });
+            } else {
+              return new Promise<SourceMaterial>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve({
+                    type: 'text',
+                    content: e.target?.result as string,
+                    fileName: file.name
+                });
+                reader.onerror = (e) => reject(new Error(`Error reading ${file.name}`));
+                reader.readAsText(file);
+              });
+            }
           })
         );
-        onFileUploaded(fileContents);
+        onFileUploaded(materials);
       } catch (err: any) {
         setError(err.message);
         setIsProcessing(false);
@@ -102,7 +134,7 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) =
       }
       // The content passed is a specific instruction for the AI
       const promptContent = `Generate a quiz based on the following topic: "${prompt}".`;
-      onFileUploaded([promptContent]);
+      onFileUploaded([{ type: 'text', content: promptContent, fileName: 'User Prompt' }]);
     }
   };
 
@@ -116,12 +148,30 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) =
     return 'Create Quiz from Prompt';
   };
 
+  const getFileIcon = (file: File) => {
+    if (file.type.startsWith('image/')) return (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+    );
+    if (file.type === 'application/pdf') return (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+    );
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+    );
+  };
+
   return (
     <div className="animate-fade-in text-center max-w-2xl mx-auto">
       <h2 className="text-3xl font-extrabold text-on-surface mb-2">Create Your Quiz</h2>
       <p className="text-lg text-on-surface-secondary mb-8">
         {mode === 'upload'
-            ? 'Provide one or more text files (TXT, JSON, MD, etc.) to generate a quiz from your content.'
+            ? 'Provide files (PDF, Text, Images) to generate a quiz from your content.'
             : 'Describe a topic, subject, or concept, and let AI generate a quiz for you.'
         }
       </p>
@@ -159,7 +209,7 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) =
               id="file-upload"
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               onChange={handleFileChange}
-              accept=".txt,.json,.md,.csv,text/*"
+              accept=".pdf,.txt,.json,.md,.csv,image/png,image/jpeg,image/webp,image/heic,text/*"
               multiple
             />
             <label htmlFor="file-upload" className="flex flex-col items-center justify-center space-y-4 cursor-pointer">
@@ -167,7 +217,7 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) =
               <p className="text-on-surface font-semibold">
                 <span className="text-primary">Click to upload</span> or drag and drop
               </p>
-              <p className="text-sm text-on-surface-secondary">TXT, JSON, MD, or any text files</p>
+              <p className="text-sm text-on-surface-secondary">PDFs, Text Docs, or Images (Diagrams/Charts)</p>
             </label>
           </div>
           
@@ -177,8 +227,11 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ onFileUploaded }) =
               <ul className="bg-surface border border-gray-200 dark:border-gray-600 rounded-lg divide-y divide-gray-200 dark:divide-gray-600">
                 {selectedFiles.map((file, index) => (
                   <li key={index} className="px-4 py-3 flex justify-between items-center">
-                    <span className="text-sm font-medium truncate text-on-surface">{file.name}</span>
-                    <button onClick={() => handleRemoveFile(index)} className="p-1 text-gray-400 hover:text-red-500 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                        {getFileIcon(file)}
+                        <span className="text-sm font-medium truncate text-on-surface">{file.name}</span>
+                    </div>
+                    <button onClick={() => handleRemoveFile(index)} className="p-1 text-gray-400 hover:text-red-500 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0">
                       <XMarkIcon className="w-5 h-5" />
                     </button>
                   </li>

@@ -150,7 +150,7 @@ const ReviewItem: React.FC<{
 };
 
 const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRetake, onStartChat, onGenerateSummary, onStartFlashcards }) => {
-  const { quizData, userAnswers, userConfidence, startTime, endTime, quizConfig, performanceSummary, isGeneratingSummary, isGeneratingFlashcards, error } = appState;
+  const { quizData, userAnswers, userConfidence, startTime, endTime, quizConfig, performanceSummary, isGeneratingSummary, isGeneratingFlashcards, error, quizTitle } = appState;
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [autoReveal, setAutoReveal] = useState(false);
   
@@ -257,8 +257,11 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ appState, onRestart, onRe
   return (
     <div className="animate-fade-in">
       <div className="bg-surface p-8 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 mb-8 transition-colors">
-        <h2 className="text-3xl font-extrabold text-center mb-2 text-on-surface">Quiz Completed!</h2>
-        <p className="text-center text-lg text-on-surface-secondary mb-8">Here's your performance breakdown.</p>
+        <div className="text-center mb-6">
+            <h2 className="text-3xl font-extrabold text-on-surface mb-1">Quiz Completed!</h2>
+            {quizTitle && <h3 className="text-xl font-semibold text-primary">{quizTitle}</h3>}
+            <p className="text-lg text-on-surface-secondary mt-2">Here's your performance breakdown.</p>
+        </div>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
           <div className="bg-primary/10 dark:bg-primary/20 p-4 rounded-xl">

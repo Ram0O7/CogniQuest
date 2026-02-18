@@ -1,20 +1,29 @@
+
 import React from 'react';
 import { BrainCircuitIcon } from './icons/BrainCircuitIcon';
 import { SunIcon } from './icons/SunIcon';
 import { MoonIcon } from './icons/MoonIcon';
+import { AppStatus } from '../../types';
 
 interface HeaderProps {
   onRestart: () => void;
-  showRestart: boolean;
+  onGoHome: () => void;
+  appStatus: AppStatus;
   theme: any;
   toggleTheme: () => void;
+  showRestart: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onRestart, showRestart, theme, toggleTheme }) => {
+export const Header: React.FC<HeaderProps> = ({ onRestart, onGoHome, appStatus, theme, toggleTheme, showRestart }) => {
+  const isDashboard = appStatus === AppStatus.DASHBOARD || appStatus === AppStatus.INITIAL;
+
   return (
     <header className="sticky top-0 z-50 bg-surface shadow-md transition-colors duration-300 dark:shadow-gray-900">
       <div className="container mx-auto px-4 md:px-8 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-3">
+        <div 
+            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={onGoHome}
+        >
           <BrainCircuitIcon className="h-8 w-8 text-primary" />
           <h1 className="text-xl md:text-2xl font-bold text-on-surface tracking-tight">
             CogniQuest
@@ -28,6 +37,16 @@ export const Header: React.FC<HeaderProps> = ({ onRestart, showRestart, theme, t
           >
             {theme === 'dark' ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
           </button>
+          
+          {!isDashboard && (
+            <button
+                onClick={onGoHome}
+                className="hidden sm:block text-on-surface font-semibold hover:text-primary transition-colors"
+            >
+                Dashboard
+            </button>
+          )}
+
           {showRestart && (
             <button
               onClick={onRestart}

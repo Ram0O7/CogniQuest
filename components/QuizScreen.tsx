@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Question, UserAnswer, QuizConfig, ConfidenceLevel, UserConfidence } from '../types';
 import Timer from './common/Timer';
@@ -149,6 +150,11 @@ const QuizScreen: React.FC<QuizScreenProps> = ({
     return 'bg-surface hover:bg-gray-100 dark:hover:bg-slate-800';
   };
 
+  // Helper to strip "A. ", "1. ", "a) " from the start of the string to avoid duplication
+  const cleanOptionText = (text: string) => {
+    return text.replace(/^([A-Z]|[a-z]|\d+)[.)\]]\s+/, '');
+  };
+
   const renderAnswerInput = () => {
     // Fallback for old data without a 'type'
     const type = currentQuestion.type || 'MCQ';
@@ -165,7 +171,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({
                 disabled={showFeedback || isSkipped}
                 className={`w-full text-left p-4 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-200 text-on-surface ${getOptionClass(option)} disabled:cursor-not-allowed`}
               >
-                <span className="font-semibold">{type === 'MCQ' ? `${String.fromCharCode(65 + index)}. ` : ''}</span> {option}
+                <span className="font-semibold">{type === 'MCQ' ? `${String.fromCharCode(65 + index)}. ` : ''}</span> {cleanOptionText(option)}
               </button>
             ))}
           </div>

@@ -1,5 +1,7 @@
+
 export enum AppStatus {
   INITIAL = 'INITIAL',
+  DASHBOARD = 'DASHBOARD',
   CONFIGURING = 'CONFIGURING',
   GENERATING = 'GENERATING',
   IN_PROGRESS = 'IN_PROGRESS',
@@ -10,6 +12,7 @@ export enum AppStatus {
 
 export type QuestionType = 'MCQ' | 'True/False' | 'Fill-in-the-Blank';
 export type ConfidenceLevel = 'Guessing' | 'Not Sure' | 'Confident' | 'Unrated';
+export type ChatMode = 'standard' | 'socratic' | 'eli5';
 
 export interface QuizConfig {
   numQuestions: number;
@@ -40,16 +43,25 @@ export interface UserConfidence {
   [questionIndex: number]: ConfidenceLevel;
 }
 
+export interface SourceMaterial {
+  type: 'text' | 'image';
+  content: string; // Text content or Base64 string (without data URI prefix for images)
+  mimeType?: string; // Required for images
+  fileName: string;
+}
+
 export interface ChatContext {
   question: Question;
   userAnswer: string | null | undefined;
-  originalContexts: string[];
+  sourceMaterials: SourceMaterial[];
 }
 
 export interface AppState {
   status: AppStatus;
-  fileContents: string[] | null;
+  sourceMaterials: SourceMaterial[] | null;
   quizConfig: QuizConfig;
+  quizTitle: string | null; // New field for smart title
+  currentHistoryId?: number; // New field to track ID for updates
   quizData: Question[] | null;
   userAnswers: UserAnswer;
   userConfidence: UserConfidence;
@@ -64,6 +76,7 @@ export interface AppState {
   error: string | null;
   flashcards: Flashcard[] | null;
   isGeneratingFlashcards: boolean;
+  isReviewingHistory?: boolean; 
 }
 
 export interface ChatMessage {
@@ -74,4 +87,18 @@ export interface ChatMessage {
 export interface Flashcard {
   front: string;
   back: string;
+}
+
+export interface QuizHistoryItem {
+  id?: number; // Auto-incremented by IDB
+  timestamp: number;
+  topic: string; // Derived from file name or prompt, or AI generated
+  score: number;
+  totalQuestions: number;
+  quizData: Question[];
+  userAnswers: UserAnswer;
+  userConfidence: UserConfidence;
+  quizConfig: QuizConfig;
+  sourceMaterials: SourceMaterial[] | null; // Stored to enable Chat/Flashcards on review
+  performanceSummary: string | null;
 }

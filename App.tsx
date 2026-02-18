@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { AppState, AppStatus, QuizConfig, Question, ConfidenceLevel, Flashcard } from './types';
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { AppState, AppStatus, QuizConfig, Question, ConfidenceLevel, Flashcard, QuizHistoryItem, SourceMaterial } from './types';
 import useLocalStorage from './hooks/useLocalStorage';
 import FileUploadScreen from './components/FileUploadScreen';
 import QuizConfigScreen from './components/QuizConfigScreen';
@@ -8,7 +9,9 @@ import QuizScreen from './components/QuizScreen';
 import ResultsScreen from './components/ResultsScreen';
 import ChatScreen from './components/ChatScreen';
 import FlashcardScreen from './components/FlashcardScreen';
+import DashboardScreen from './components/DashboardScreen';
 import { generateQuiz, generateHint, generatePerformanceSummary, generateFlashcards } from './services/geminiService';
+import { saveSession, getSession, saveQuizHistory, updateQuizHistory, clearSession } from './services/db';
 import { Header } from './components/common/Header';
 
 const initialConfig: QuizConfig = {
@@ -24,9 +27,11 @@ const initialConfig: QuizConfig = {
 };
 
 const initialAppState: AppState = {
-    status: AppStatus.INITIAL,
-    fileContents: null,
+    status: AppStatus.INITIAL, // Will be overridden by DB check
+    sourceMaterials: null,
     quizConfig: initialConfig,
+    quizTitle: null,
+    currentHistoryId: undefined,
     quizData: null,
     userAnswers: {},
     userConfidence: {},
@@ -41,18 +46,24 @@ const initialAppState: AppState = {
     error: null,
     flashcards: null,
     isGeneratingFlashcards: false,
+    isReviewingHistory: false,
 };
 
-
 const App: React.FC = () => {
-  const [storedState, setStoredState] = useLocalStorage<AppState | null>('quiz-session', null);
-  const [appState, setAppState] = useState<AppState>(
-    storedState || initialAppState
-  );
-
-  // Theme State
+  // Theme State (Preference, can stay in LocalStorage)
   const [theme, setTheme] = useLocalStorage('theme', 'light');
+  
+  // App State
+  const [appState, setAppState] = useState<AppState>(initialAppState);
+  const [isDbLoaded, setIsDbLoaded] = useState(false);
+  const appStateRef = useRef(appState);
 
+  // Update ref whenever state changes for use in unmount/effects if needed
+  useEffect(() => {
+    appStateRef.current = appState;
+  }, [appState]);
+
+  // --- Theme Effect ---
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -65,36 +76,119 @@ const App: React.FC = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
+  // --- IndexedDB Initialization ---
   useEffect(() => {
-    if (appState.status === AppStatus.INITIAL && storedState !== null) {
-      setStoredState(null);
-    } else if (appState.status !== AppStatus.INITIAL) {
-      setStoredState(appState);
-    }
-  }, [appState, setStoredState, storedState]);
-  
-  useEffect(() => {
-    if (appState.status === AppStatus.COMPLETED && appState.isGeneratingSummary) {
-        const fetchSummary = async () => {
-            const { quizData, userAnswers, userConfidence, quizConfig } = appState;
-            if (!quizData) {
-                setAppState(prev => ({ ...prev, isGeneratingSummary: false }));
-                return;
-            }
-            try {
-              const summary = await generatePerformanceSummary(quizData, userAnswers, userConfidence, quizConfig);
-              setAppState(prev => ({ ...prev, performanceSummary: summary, isGeneratingSummary: false }));
-            } catch (error: any) {
-              setAppState(prev => ({ ...prev, error: "Failed to generate AI performance summary.", isGeneratingSummary: false }));
-            }
-        };
-        fetchSummary();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appState.status, appState.isGeneratingSummary]);
+    const initSession = async () => {
+        const storedSession = await getSession();
+        if (storedSession && storedSession.sourceMaterials) { // Basic validation for new schema
+            setAppState(storedSession);
+        } else {
+            // If no active session or old schema, go to Dashboard
+            setAppState(prev => ({ ...prev, status: AppStatus.DASHBOARD }));
+        }
+        setIsDbLoaded(true);
+    };
+    initSession();
+  }, []);
 
-  const handleFileUploaded = (contents: string[]) => {
-    setAppState(prev => ({ ...prev, status: AppStatus.CONFIGURING, fileContents: contents, error: null }));
+  // --- Save Session Logic ---
+  // Save to DB whenever key state changes, but debounce slightly or check for critical changes
+  useEffect(() => {
+    if (!isDbLoaded) return;
+    saveSession(appState);
+  }, [appState, isDbLoaded]);
+
+
+  // --- History Logic ---
+  const saveToHistory = useCallback(async () => {
+    const { quizData, userAnswers, userConfidence, quizConfig, sourceMaterials, performanceSummary, quizTitle, currentHistoryId } = appStateRef.current;
+    
+    if (!quizData || appStateRef.current.isReviewingHistory) return;
+
+    // Calculate score for summary
+    let correctCount = 0;
+    quizData.forEach((q, i) => {
+        if (q.type === 'Fill-in-the-Blank') {
+            if (userAnswers[i]?.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()) correctCount++;
+        } else {
+            if (userAnswers[i] === q.correctAnswer) correctCount++;
+        }
+    });
+
+    // Derive a Topic Name if quizTitle is missing for some reason
+    let topic = quizTitle || "Generated Quiz";
+    if (!quizTitle && sourceMaterials && sourceMaterials.length > 0) {
+        if (sourceMaterials[0].fileName && sourceMaterials[0].fileName !== 'User Prompt') {
+             topic = sourceMaterials[0].fileName;
+             if (sourceMaterials.length > 1) topic += ` + ${sourceMaterials.length - 1} more`;
+        } else if (sourceMaterials[0].type === 'text') {
+             topic = sourceMaterials[0].content.split('\n')[0].substring(0, 50);
+        }
+    }
+
+    const historyItem: Omit<QuizHistoryItem, 'id'> = {
+        timestamp: Date.now(),
+        topic: topic,
+        score: correctCount, // Raw score
+        totalQuestions: quizData.length,
+        quizData,
+        userAnswers,
+        userConfidence,
+        quizConfig,
+        sourceMaterials,
+        performanceSummary
+    };
+
+    if (currentHistoryId) {
+        // Update existing record (overwrite logic)
+        await updateQuizHistory(currentHistoryId, historyItem);
+    } else {
+        // Create new record and track its ID
+        const newId = await saveQuizHistory(historyItem);
+        setAppState(prev => ({ ...prev, currentHistoryId: newId }));
+    }
+
+  }, []); // Dependencies accessed via ref
+
+
+  // --- Event Handlers ---
+
+  const handleGoToDashboard = useCallback(() => {
+      if (appState.status === AppStatus.IN_PROGRESS) {
+          if(!window.confirm("You are currently taking a quiz. Leaving now will save your progress but pausing the timer. Continue?")) {
+              return;
+          }
+      }
+      setAppState(prev => ({ ...prev, status: AppStatus.DASHBOARD }));
+  }, [appState.status]);
+
+  const handleStartNewConfig = () => {
+      setAppState({
+          ...initialAppState,
+          status: AppStatus.INITIAL
+      });
+  };
+
+  const handleReviewHistory = (item: QuizHistoryItem) => {
+      setAppState({
+          ...initialAppState,
+          status: AppStatus.COMPLETED,
+          quizData: item.quizData,
+          userAnswers: item.userAnswers,
+          userConfidence: item.userConfidence,
+          quizConfig: item.quizConfig,
+          sourceMaterials: item.sourceMaterials,
+          quizTitle: item.topic,
+          currentHistoryId: item.id, // IMPORTANT: Set ID so retakes update this record
+          performanceSummary: item.performanceSummary,
+          startTime: item.timestamp, // approximate
+          endTime: item.timestamp,
+          isReviewingHistory: true, // Read-only mode flag for initial view
+      });
+  };
+
+  const handleFileUploaded = (materials: SourceMaterial[]) => {
+    setAppState(prev => ({ ...prev, status: AppStatus.CONFIGURING, sourceMaterials: materials, error: null, currentHistoryId: undefined, quizTitle: null }));
   };
 
   const handleConfigChange = (newConfig: Partial<QuizConfig>) => {
@@ -105,16 +199,16 @@ const App: React.FC = () => {
   };
 
   const handleStartQuiz = async () => {
-    if (!appState.fileContents || appState.fileContents.length === 0) return;
+    if (!appState.sourceMaterials || appState.sourceMaterials.length === 0) return;
     setAppState(prev => ({ ...prev, status: AppStatus.GENERATING, error: null }));
     try {
-      const combinedContent = appState.fileContents.join('\n\n--- (New Document) ---\n\n');
-      const quizQuestions = await generateQuiz(combinedContent, appState.quizConfig);
-      if (quizQuestions && quizQuestions.length > 0) {
+      const { title, questions } = await generateQuiz(appState.sourceMaterials, appState.quizConfig);
+      if (questions && questions.length > 0) {
         setAppState(prev => ({
           ...prev,
           status: AppStatus.IN_PROGRESS,
-          quizData: quizQuestions,
+          quizTitle: title,
+          quizData: questions,
           startTime: Date.now(),
           userAnswers: {},
           userConfidence: {},
@@ -123,6 +217,8 @@ const App: React.FC = () => {
           loadingHints: {},
           performanceSummary: null,
           isGeneratingSummary: false,
+          isReviewingHistory: false,
+          currentHistoryId: undefined // New quiz means new history ID (until saved)
         }));
       } else {
         throw new Error("The generated quiz was empty or invalid. The source material may not have been suitable.");
@@ -155,7 +251,7 @@ const App: React.FC = () => {
   };
 
   const handleGetHint = async (questionIndex: number) => {
-    if (!appState.fileContents || !appState.quizData) return;
+    if (!appState.sourceMaterials || !appState.quizData) return;
     
     setAppState(prev => ({
       ...prev,
@@ -163,9 +259,8 @@ const App: React.FC = () => {
     }));
 
     try {
-      const combinedContent = appState.fileContents.join('\n\n--- (New Document) ---\n\n');
       const question = appState.quizData[questionIndex];
-      const hint = await generateHint(combinedContent, question);
+      const hint = await generateHint(appState.sourceMaterials, question);
       if (hint) {
         setAppState(prev => ({
           ...prev,
@@ -174,7 +269,6 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("Failed to generate hint:", error);
-      // Optionally show an error to the user
     } finally {
       setAppState(prev => ({
         ...prev,
@@ -204,7 +298,9 @@ const App: React.FC = () => {
       performanceSummary: null,
       error: null,
     }));
-  }, []);
+    // Trigger save to history immediately after state update
+    setTimeout(saveToHistory, 100);
+  }, [saveToHistory]);
 
   const handleGenerateSummary = useCallback(() => {
       if (appState.status === AppStatus.COMPLETED) {
@@ -212,8 +308,14 @@ const App: React.FC = () => {
       }
   }, [appState.status]);
 
+  // Restarting means configuring a new quiz with SAME content
   const handleRestart = () => {
-    setAppState(initialAppState);
+    setAppState(prev => ({
+        ...initialAppState,
+        status: AppStatus.CONFIGURING,
+        sourceMaterials: prev.sourceMaterials, // Keep files
+        currentHistoryId: undefined, // New quiz generation -> New history ID
+    }));
   };
 
   const handleRetakeQuiz = useCallback(() => {
@@ -230,11 +332,13 @@ const App: React.FC = () => {
       performanceSummary: null,
       isGeneratingSummary: false,
       error: null,
+      isReviewingHistory: false, // New attempt
+      // IMPORTANT: Keep prev.currentHistoryId so we overwrite the existing record
     }));
   }, []);
 
   const handleStartChat = useCallback((question: Question) => {
-    if (!appState.quizData || !appState.fileContents) return;
+    if (!appState.quizData || !appState.sourceMaterials) return;
     const userAnswer = appState.userAnswers[appState.quizData.findIndex(q => q.question === question.question)];
     setAppState(prev => ({
       ...prev,
@@ -242,10 +346,10 @@ const App: React.FC = () => {
       chatContext: {
         question,
         userAnswer,
-        originalContexts: prev.fileContents!,
+        sourceMaterials: prev.sourceMaterials!,
       }
     }));
-  }, [appState.fileContents, appState.quizData, appState.userAnswers]);
+  }, [appState.sourceMaterials, appState.quizData, appState.userAnswers]);
 
   const handleExitChat = useCallback(() => {
     setAppState(prev => ({
@@ -256,8 +360,8 @@ const App: React.FC = () => {
   }, []);
 
   const handleStartFlashcards = async () => {
-    const { quizData, userAnswers, fileContents } = appState;
-    if (!quizData || !fileContents) return;
+    const { quizData, userAnswers, sourceMaterials } = appState;
+    if (!quizData || !sourceMaterials) return;
 
     setAppState(prev => ({ ...prev, isGeneratingFlashcards: true, error: null }));
 
@@ -276,7 +380,7 @@ const App: React.FC = () => {
         return; // This case is handled in ResultsScreen UI.
       }
       
-      const generatedFlashcards = await generateFlashcards(incorrectQuestions, fileContents);
+      const generatedFlashcards = await generateFlashcards(incorrectQuestions, sourceMaterials);
       
       if (generatedFlashcards && generatedFlashcards.length > 0) {
         setAppState(prev => ({
@@ -307,8 +411,11 @@ const App: React.FC = () => {
 
 
   const renderContent = () => {
-    // Add a unique key to each top-level component to ensure it re-mounts with a fresh state on status change
+    if (!isDbLoaded) return <LoadingScreen text="Loading your session..." />;
+
     switch (appState.status) {
+      case AppStatus.DASHBOARD:
+        return <DashboardScreen onStartNew={handleStartNewConfig} onReview={handleReviewHistory} />;
       case AppStatus.INITIAL:
         return <FileUploadScreen key="initial" onFileUploaded={handleFileUploaded} />;
       case AppStatus.CONFIGURING:
@@ -346,23 +453,25 @@ const App: React.FC = () => {
           />
         );
       case AppStatus.COMPLETED:
-        return <ResultsScreen key="completed" appState={appState} onRestart={handleRestart} onRetake={handleRetakeQuiz} onStartChat={handleStartChat} onGenerateSummary={handleGenerateSummary} onStartFlashcards={handleStartFlashcards} />;
+        return <ResultsScreen key="completed" appState={appState} onRestart={handleStartNewConfig} onRetake={handleRetakeQuiz} onStartChat={handleStartChat} onGenerateSummary={handleGenerateSummary} onStartFlashcards={handleStartFlashcards} />;
       case AppStatus.CHATTING:
-        if (!appState.chatContext) return <ResultsScreen key="chat-fallback" appState={appState} onRestart={handleRestart} onRetake={handleRetakeQuiz} onStartChat={handleStartChat} onGenerateSummary={handleGenerateSummary} onStartFlashcards={handleStartFlashcards} />;
+        if (!appState.chatContext) return <ResultsScreen key="chat-fallback" appState={appState} onRestart={handleStartNewConfig} onRetake={handleRetakeQuiz} onStartChat={handleStartChat} onGenerateSummary={handleGenerateSummary} onStartFlashcards={handleStartFlashcards} />;
         return <ChatScreen key="chatting" chatContext={appState.chatContext} onExitChat={handleExitChat} />;
       case AppStatus.FLASHCARDS:
-        if (!appState.flashcards) return <ResultsScreen key="flashcard-fallback" appState={appState} onRestart={handleRestart} onRetake={handleRetakeQuiz} onStartChat={handleStartChat} onGenerateSummary={handleGenerateSummary} onStartFlashcards={handleStartFlashcards} />;
+        if (!appState.flashcards) return <ResultsScreen key="flashcard-fallback" appState={appState} onRestart={handleStartNewConfig} onRetake={handleRetakeQuiz} onStartChat={handleStartChat} onGenerateSummary={handleGenerateSummary} onStartFlashcards={handleStartFlashcards} />;
         return <FlashcardScreen key="flashcards" flashcards={appState.flashcards} onExit={handleExitFlashcards} />;
       default:
-        return <FileUploadScreen key="default" onFileUploaded={handleFileUploaded} />;
+        return <DashboardScreen onStartNew={handleStartNewConfig} onReview={handleReviewHistory} />;
     }
   };
 
   return (
     <div className="min-h-screen bg-background transition-colors duration-300">
       <Header 
-        onRestart={handleRestart} 
-        showRestart={appState.status !== AppStatus.INITIAL && appState.status !== AppStatus.CHATTING} 
+        onRestart={handleStartNewConfig} 
+        onGoHome={handleGoToDashboard}
+        showRestart={appState.status !== AppStatus.INITIAL && appState.status !== AppStatus.DASHBOARD && appState.status !== AppStatus.CHATTING} 
+        appStatus={appState.status}
         theme={theme}
         toggleTheme={toggleTheme}
       />

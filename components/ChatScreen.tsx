@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { ChatContext, ChatMessage } from '../types';
+import { ChatContext, ChatMessage, ChatMode } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { PaperAirplaneIcon } from './common/icons/PaperAirplaneIcon';
 import { ArrowLeftIcon } from './common/icons/ArrowLeftIcon';
@@ -27,12 +28,12 @@ const AIMessageContent: React.FC<{ fullText: string; isStreaming: boolean }> = (
 
 
 const ChatScreen: React.FC<ChatScreenProps> = ({ chatContext, onExitChat }) => {
-  const { question, userAnswer, originalContexts } = chatContext;
+  const { question, userAnswer, sourceMaterials } = chatContext;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [isSocraticMode, setIsSocraticMode] = useState(false);
+  const [chatMode, setChatMode] = useState<ChatMode>('standard');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,7 +60,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ chatContext, onExitChat }) => {
     setIsLoading(true);
 
     try {
-      const responseGenerator = getChatResponse(question, userAnswer, currentMessages, originalContexts, isSocraticMode);
+      const responseGenerator = getChatResponse(question, userAnswer, currentMessages, sourceMaterials, chatMode);
       let fullResponse = '';
       for await (const chunk of responseGenerator) {
         fullResponse += chunk;
@@ -95,33 +96,40 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ chatContext, onExitChat }) => {
     handleSend(suggestion);
   };
 
+  const modes: { id: ChatMode; label: string }[] = [
+    { id: 'standard', label: 'Standard' },
+    { id: 'socratic', label: 'Socratic' },
+    { id: 'eli5', label: 'ELI5' },
+  ];
+
   return (
     <div className="w-full h-[calc(100vh-120px)] bg-surface rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col animate-fade-in transition-colors">
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-4 flex-shrink-0">
-          <div className="flex items-center gap-4">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4 flex-shrink-0">
+          <div className="flex items-center gap-4 w-full sm:w-auto">
             <button onClick={onExitChat} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
               <ArrowLeftIcon className="w-6 h-6 text-on-surface-secondary" />
             </button>
-            <div>
+            <div className="flex-1 sm:flex-none">
               <h3 className="text-lg font-bold text-on-surface">AI Tutor</h3>
-              <p className="text-sm text-on-surface-secondary truncate max-w-md sm:max-w-lg md:max-w-xl">{question.question}</p>
+              <p className="text-sm text-on-surface-secondary truncate max-w-[200px] sm:max-w-xs">{question.question}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 pr-2">
-            <label htmlFor="socratic-toggle" className="text-sm font-medium text-on-surface-secondary cursor-pointer">
-              Socratic Mode
-            </label>
-            <label htmlFor="socratic-toggle" className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                id="socratic-toggle"
-                checked={isSocraticMode}
-                onChange={() => setIsSocraticMode(!isSocraticMode)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-primary/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-            </label>
+          
+          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-full sm:w-auto">
+            {modes.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setChatMode(m.id)}
+                className={`flex-1 sm:flex-none px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                  chatMode === m.id
+                    ? 'bg-surface shadow text-primary'
+                    : 'text-on-surface-secondary hover:text-on-surface'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
           </div>
         </div>
         
